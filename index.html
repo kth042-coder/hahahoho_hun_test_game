@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Block Puzzle Master</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter & Press Start 2P for retro touch -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation;
+        }
+        /* Custom animations for clearing blocks */
+        @keyframes popClear {
+            0% { transform: scale(1); background-color: #facc15; }
+            50% { transform: scale(1.2); background-color: #ffffff; }
+            100% { transform: scale(0); opacity: 0; }
+        }
+        .animate-pop {
+            animation: popClear 0.4s ease-out forwards;
+        }
+        /* Smooth transitions */
+        .piece-cell {
+            transition: transform 0.1s ease, background-color 0.15s ease;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-between p-4 select-none overflow-x-hidden">
+
+    <!-- Header / Score Board -->
+    <header class="w-full max-w-md flex flex-col items-center gap-2 mb-2">
+        <h1 class="text-3xl font-black tracking-wider bg-gradient-to-r from-cyan-400 via-indigo-500 to-purple-500 bg-clip-text text-transparent">
+            BLOCK PUZZLE
+        </h1>
+        <div class="flex justify-between w-full px-4 py-2 bg-slate-900/80 backdrop-blur border border-slate-800 rounded-2xl shadow-xl">
+            <div class="text-center">
+                <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Score</p>
+                <p id="score" class="text-2xl font-black text-cyan-400">0</p>
+            </div>
+            <div class="h-8 w-px bg-slate-800 self-center"></div>
+            <div class="text-center">
+                <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider">High Score</p>
+                <p id="high-score" class="text-2xl font-black text-purple-400">0</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Game Area -->
+    <main class="w-full max-w-md flex flex-col items-center gap-6 my-auto">
+        <!-- 9x9 Grid -->
+        <div id="grid-container" class="relative bg-slate-900/90 p-3 rounded-2xl border-2 border-slate-800 shadow-2xl grid grid-cols-9 gap-1 w-full aspect-square max-w-[380px]">
+            <!-- Grid cells generated dynamically via JS -->
+        </div>
+
+        <!-- Piece Selection Tray -->
+        <div id="tray" class="flex justify-around items-center w-full bg-slate-900/80 backdrop-blur border border-slate-800 rounded-2xl p-4 min-h-[130px] shadow-xl">
+            <!-- 3 available pieces generated dynamically via JS -->
+        </div>
+    </main>
+
+    <!-- Controls / Action Buttons -->
+    <footer class="w-full max-w-md flex justify-center gap-4 mt-4">
+        <button id="restart-btn" class="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/20 active:scale-95 transition-all">
+            새 게임
+        </button>
+        <button id="sound-btn" class="px-4 py-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold rounded-xl shadow-lg active:scale-95 transition-all flex items-center gap-2">
+            🔊 <span id="sound-text">소리 켜짐</span>
+        </button>
+        <button id="music-btn" class="px-4 py-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold rounded-xl shadow-lg active:scale-95 transition-all flex items-center gap-2">
+            🎵 <span id="music-text">BGM 켜짐</span>
+        </button>
+    </footer>
+
+    <!-- Game Over Modal -->
+    <div id="game-over-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-slate-900 border border-slate-800 rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-200">
+            <div class="w-16 h-16 bg-red-500/10 text-red-400 rounded-2xl flex items-center justify-center text-3xl font-black mb-1">
+                💥
+            </div>
+            <h2 class="text-2xl font-black text-slate-100">게임 오버!</h2>
+            <p class="text-slate-400 text-sm">더 이상 블록을 놓을 공간이 없습니다.</p>
+            <div class="bg-slate-950/60 rounded-2xl p-4 w-full border border-slate-800/80 my-2">
+                <p class="text-xs text-slate-400 uppercase font-semibold">최종 점수</p>
+                <p id="final-score" class="text-3xl font-black text-cyan-400">0</p>
+            </div>
+            <button id="modal-restart-btn" class="w-full py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/20 active:scale-95 transition-all">
+                다시 시작하기
+            </button>
+        </div>
+    </div>
+
+    <!-- Message notification overlay -->
+    <div id="toast" class="fixed bottom-10 bg-slate-800 text-slate-100 px-4 py-2 rounded-xl shadow-xl border border-slate-700 opacity-0 transition-opacity duration-300 pointer-events-none z-40 text-sm font-semibold">
+        알림 메시지
+    </div>
+
+    <script>
+        // --- Game Shapes & Colors ---
+        const SHAPES = [
+            // Single cell
+            [[1]],
+            // 2x1 & 1x2
+            [[1, 1]],
+            [[1], [1]],
+            // 3x1 & 1x3
+            [[1, 1, 1]],
+            [[1], [1], [1]],
+            // 2x2 Square
+            [[1, 1], [1, 1]],
+            // 3x3 Square
+            [[1, 1, 1], [1, 1, 1], [1, 1, 1]],
+            // L Shapes
+            [[1, 0], [1, 1]],
+            [[0, 1], [1, 1]],
+            [[1, 1], [1, 0]],
+            [[1, 1], [0, 1]],
+            // T Shapes
+            [[1, 1, 1], [0, 1, 0]],
+            [[0, 1, 0], [1, 1, 1]]
+        ];
+
+        const COLORS = [
+            { bg: 'bg-cyan-500', shadow: 'shadow-cyan-500/50' },
+            { bg: 'bg-blue-500', shadow: 'shadow-blue-500/50' },
+            { bg: 'bg-indigo-500', shadow: 'shadow-indigo-500/50' },
+            { bg: 'bg-purple-500', shadow: 'shadow-purple-500/50' },
+            { bg: 'bg-fuchsia-500', shadow: 'shadow-fuchsia-500/50' },
+            { bg: 'bg-rose-500', shadow: 'shadow-rose-500/50' },
+            { bg: 'bg-amber-500', shadow: 'shadow-amber-500/50' },
+            { bg: 'bg-emerald-500', shadow: 'shadow-emerald-500/50' }
+        ];
+
+        // --- Game State & Constants ---
+        const GRID_SIZE = 9;
+        let grid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(0)); // 0: empty, color string: filled
+        let score = 0;
+        let highScore = localStorage.getItem('block_puzzle_highscore') || 0;
+        let availablePieces = [null, null, null];
+        let selectedPieceIndex = null;
+        let soundEnabled = true;
+        let musicEnabled = true;
+
+        // --- Web Audio API Sound Effects & Background Music ---
+        let audioCtx = null;
+        let bgmInterval = null;
+        let bgmStep = 0;
+
+        // Simple pentatonic chords melody for background music
+        const BGM_NOTES = [
+            261.63, 329.63, 392.00, 523.25, // C4, E4, G4, C5
+            293.66, 349.23, 440.00, 587.33, // D4, F4, A4, D5
+            329.63, 392.00, 493.88, 659.25, // E4, G4, B4, E5
+            349.23, 440.00, 523.25, 698.46  // F4, A4, C5, F5
+        ];
+
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playBGMStep() {
+            if (!musicEnabled || !audioCtx) return;
+            
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            
+            osc.type = 'sine';
+            const noteFreq = BGM_NOTES[bgmStep % BGM_NOTES.length];
+            osc.frequency.setValueAtTime(noteFreq, audioCtx.currentTime);
+            
+            gain.gain.setValueAtTime(0.02, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.4);
+            
+            bgmStep = (bgmStep + 1) % BGM_NOTES.length;
+        }
+
+        function startBGM() {
+            if (bgmInterval) clearInterval(bgmInterval);
+            bgmInterval = setInterval(playBGMStep, 400);
+        }
+
+        function stopBGM() {
+            if (bgmInterval) {
+                clearInterval(bgmInterval);
+                bgmInterval = null;
+            }
+        }
+
+        function playSound(type) {
+            if (!soundEnabled) return;
+            initAudio();
+            if (!audioCtx) return;
+
+            const now = audioCtx.currentTime;
+
+            if (type === 'place') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(261.63, now); // C4
+                osc.frequency.exponentialRampToValueAtTime(523.25, now + 0.12); // C5
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.12);
+            } else if (type === 'clear') {
+                // Arpeggio sound effect on line clear
+                [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.05);
+                    gain.gain.setValueAtTime(0.18, now + idx * 0.05);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + idx * 0.05 + 0.15);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start(now + idx * 0.05);
+                    osc.stop(now + idx * 0.05 + 0.15);
+                });
+            } else if (type === 'gameover') {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(80, now + 0.6);
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.6);
+            }
+        }
+
+        // --- DOM Elements ---
+        const gridContainer = document.getElementById('grid-container');
+        const trayContainer = document.getElementById('tray');
+        const scoreEl = document.getElementById('score');
+        const highScoreEl = document.getElementById('high-score');
+        const finalScoreEl = document.getElementById('final-score');
+        const gameOverModal = document.getElementById('game-over-modal');
+        const restartBtn = document.getElementById('restart-btn');
+        const modalRestartBtn = document.getElementById('modal-restart-btn');
+        const soundBtn = document.getElementById('sound-btn');
+        const soundText = document.getElementById('sound-text');
+        const musicBtn = document.getElementById('music-btn');
+        const musicText = document.getElementById('music-text');
+        const toastEl = document.getElementById('toast');
+
+        // --- Initialization ---
+        function initGame() {
+            grid = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(0));
+            score = 0;
+            selectedPieceIndex = null;
+            gameOverModal.classList.add('hidden');
+            updateScoreDisplay();
+            generateNewPieces();
+            renderGrid();
+            renderTray();
+
+            initAudio();
+            if (musicEnabled) {
+                startBGM();
+            }
+        }
+
+        highScoreEl.textContent = highScore;
+
+        // --- Rendering ---
+        function renderGrid(previewCells = []) {
+            gridContainer.innerHTML = '';
+            for (let r = 0; r < GRID_SIZE; r++) {
+                for (let c = 0; c < GRID_SIZE; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'w-full aspect-square rounded-md transition-all duration-150 flex items-center justify-center';
+                    
+                    const isPreview = previewCells.some(p => p.r === r && p.c === c);
+                    
+                    if (grid[r][c] !== 0) {
+                        cell.className += ` ${grid[r][c]} shadow-inner`;
+                    } else if (isPreview) {
+                        cell.className += ` bg-white/40 border border-white/60 animate-pulse`;
+                    } else {
+                        // Subtle alternating or clean dark background
+                        cell.className += ` bg-slate-950/50 border border-slate-800/40 hover:bg-slate-900/40`;
+                    }
+
+                    // Click to place piece if a piece is selected
+                    cell.addEventListener('click', () => handleGridClick(r, c));
+                    cell.addEventListener('mouseenter', () => handleGridHover(r, c));
+                    
+                    gridContainer.appendChild(cell);
+                }
+            }
+            gridContainer.onmouseleave = () => renderGrid();
+        }
+
+        function renderTray() {
+            trayContainer.innerHTML = '';
+            availablePieces.forEach((piece, index) => {
+                const wrapper = document.createElement('div');
+                wrapper.className = `cursor-pointer p-2 rounded-xl flex items-center justify-center transition-all ${selectedPieceIndex === index ? 'bg-cyan-500/20 border-2 border-cyan-400 scale-105 shadow-lg shadow-cyan-500/20' : 'bg-slate-950/40 border border-slate-800/80 hover:border-slate-700'}`;
+                
+                if (piece === null) {
+                    wrapper.className += ' opacity-30 cursor-not-allowed';
+                    trayContainer.appendChild(wrapper);
+                    return;
+                }
+
+                // Render miniature matrix for the piece
+                const rows = piece.shape.length;
+                const cols = piece.shape[0].length;
+                
+                const miniGrid = document.createElement('div');
+                miniGrid.className = `grid gap-1`;
+                miniGrid.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        const mCell = document.createElement('div');
+                        mCell.className = 'w-5 h-5 rounded';
+                        if (piece.shape[r][c] === 1) {
+                            mCell.className += ` ${piece.color.bg} shadow-sm ${piece.color.shadow}`;
+                        } else {
+                            mCell.className += ' bg-transparent';
+                        }
+                        miniGrid.appendChild(mCell);
+                    }
+                }
+
+                wrapper.appendChild(miniGrid);
+                wrapper.addEventListener('click', () => {
+                    if (availablePieces[index] !== null) {
+                        selectedPieceIndex = (selectedPieceIndex === index) ? null : index;
+                        renderTray();
+                        renderGrid();
+                    }
+                });
+
+                trayContainer.appendChild(wrapper);
+            });
+        }
+
+        // --- Piece Generation ---
+        function getRandomPiece() {
+            const randomShape = SHAPES[Math.floor(Math.random() * SHAPES.length)];
+            const randomColor = COLORS[Math.floor(Math.random() * COLORS.length)];
+            return { shape: randomShape, color: randomColor };
+        }
+
+        function generateNewPieces() {
+            availablePieces = [getRandomPiece(), getRandomPiece(), getRandomPiece()];
+            checkGameOver();
+        }
+
+        // --- Game Logic: Hover & Placement ---
+        function handleGridHover(r, c) {
+            if (selectedPieceIndex === null || availablePieces[selectedPieceIndex] === null) return;
+            const piece = availablePieces[selectedPieceIndex];
+            const preview = getPlacementCoordinates(r, c, piece.shape);
+            
+            if (canPlace(r, c, piece.shape)) {
+                renderGrid(preview);
+            } else {
+                renderGrid();
+            }
+        }
+
+        function getPlacementCoordinates(startR, startC, shape) {
+            const coords = [];
+            for (let r = 0; r < shape.length; r++) {
+                for (let c = 0; c < shape[0].length; c++) {
+                    if (shape[r][c] === 1) {
+                        coords.push({ r: startR + r, c: startC + c });
+                    }
+                }
+            }
+            return coords;
+        }
+
+        function canPlace(startR, startC, shape) {
+            const rows = shape.length;
+            const cols = shape[0].length;
+
+            if (startR + rows > GRID_SIZE || startC + cols > GRID_SIZE) return false;
+
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (shape[r][c] === 1) {
+                        if (grid[startR + r][startC + c] !== 0) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        }
+
+        function handleGridClick(r, c) {
+            if (selectedPieceIndex === null || availablePieces[selectedPieceIndex] === null) {
+                showToast("선택된 블록이 없습니다.");
+                return;
+            }
+
+            const piece = availablePieces[selectedPieceIndex];
+
+            if (!canPlace(r, c, piece.shape)) {
+                showToast("여기에 블록을 놓을 수 없습니다!");
+                return;
+            }
+
+            // Place piece
+            let placedCount = 0;
+            for (let pr = 0; pr < piece.shape.length; pr++) {
+                for (let pc = 0; pc < piece.shape[0].length; pc++) {
+                    if (piece.shape[pr][pc] === 1) {
+                        grid[r + pr][c + pc] = piece.color.bg;
+                        placedCount++;
+                    }
+                }
+            }
+
+            playSound('place');
+            score += placedCount * 10;
+
+            // Consume piece
+            availablePieces[selectedPieceIndex] = null;
+            selectedPieceIndex = null;
+
+            // Check lines / columns / 3x3 boxes for clearing
+            checkAndClearLines();
+
+            // Check if all 3 pieces are used
+            if (availablePieces.every(p => p === null)) {
+                generateNewPieces();
+            } else {
+                checkGameOver();
+            }
+
+            updateScoreDisplay();
+            renderGrid();
+            renderTray();
+        }
+
+        // --- Line Clearing & Scoring ---
+        function checkAndClearLines() {
+            let rowsToClear = [];
+            let colsToClear = [];
+            let boxesToClear = []; // 3x3 grids
+
+            // Check rows
+            for (let r = 0; r < GRID_SIZE; r++) {
+                if (grid[r].every(cell => cell !== 0)) {
+                    rowsToClear.push(r);
+                }
+            }
+
+            // Check cols
+            for (let c = 0; c < GRID_SIZE; c++) {
+                let full = true;
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    if (grid[r][c] === 0) {
+                        full = false;
+                        break;
+                    }
+                }
+                if (full) colsToClear.push(c);
+            }
+
+            // Check 3x3 subgrids
+            for (let br = 0; br < 3; br++) {
+                for (let bc = 0; bc < 3; bc++) {
+                    let full = true;
+                    for (let r = 0; r < 3; r++) {
+                        for (let c = 0; c < 3; c++) {
+                            if (grid[br * 3 + r][bc * 3 + c] === 0) {
+                                full = false;
+                                break;
+                            }
+                        }
+                    }
+                    if (full) boxesToClear.push({ br, bc });
+                }
+            }
+
+            const totalClears = rowsToClear.length + colsToClear.length + boxesToClear.length;
+            if (totalClears > 0) {
+                playSound('clear');
+                
+                // Clear rows
+                rowsToClear.forEach(r => {
+                    for (let c = 0; c < GRID_SIZE; c++) grid[r][c] = 0;
+                });
+
+                // Clear cols
+                colsToClear.forEach(c => {
+                    for (let r = 0; r < GRID_SIZE; r++) grid[r][c] = 0;
+                });
+
+                // Clear boxes
+                boxesToClear.forEach(b => {
+                    for (let r = 0; r < 3; r++) {
+                        for (let c = 0; c < 3; c++) {
+                            grid[b.br * 3 + r][b.bc * 3 + c] = 0;
+                        }
+                    }
+                });
+
+                // Bonus score for multiple line clears
+                const bonus = totalClears > 1 ? totalClears * 50 : 0;
+                score += (totalClears * 100) + bonus;
+                showToast(`✨ ${totalClears}개 라인 클리어! (+${(totalClears * 100) + bonus})`);
+            }
+
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('block_puzzle_highscore', highScore);
+                highScoreEl.textContent = highScore;
+            }
+        }
+
+        // --- Game Over Check ---
+        function checkGameOver() {
+            // Check if any available piece can fit anywhere on the grid
+            const remainingPieces = availablePieces.filter(p => p !== null);
+            if (remainingPieces.length === 0) return;
+
+            let possible = false;
+            for (let piece of remainingPieces) {
+                for (let r = 0; r < GRID_SIZE; r++) {
+                    for (let c = 0; c < GRID_SIZE; c++) {
+                        if (canPlace(r, c, piece.shape)) {
+                            possible = true;
+                            break;
+                        }
+                    }
+                    if (possible) break;
+                }
+                if (possible) break;
+            }
+
+            if (!possible) {
+                stopBGM();
+                playSound('gameover');
+                finalScoreEl.textContent = score;
+                gameOverModal.classList.remove('hidden');
+            }
+        }
+
+        // --- UI Helpers ---
+        function updateScoreDisplay() {
+            scoreEl.textContent = score;
+            highScoreEl.textContent = highScore;
+        }
+
+        let toastTimeout;
+        function showToast(msg) {
+            toastEl.textContent = msg;
+            toastEl.classList.remove('opacity-0');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toastEl.classList.add('opacity-0');
+            }, 2000);
+        }
+
+        // --- Event Listeners ---
+        restartBtn.addEventListener('click', initGame);
+        modalRestartBtn.addEventListener('click', initGame);
+
+        soundBtn.addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            soundText.textContent = soundEnabled ? '소리 켜짐' : '소리 꺼짐';
+            soundBtn.classList.toggle('bg-slate-800', soundEnabled);
+        });
+
+        musicBtn.addEventListener('click', () => {
+            initAudio();
+            musicEnabled = !musicEnabled;
+            musicText.textContent = musicEnabled ? 'BGM 켜짐' : 'BGM 꺼짐';
+            musicBtn.classList.toggle('bg-slate-800', musicEnabled);
+
+            if (musicEnabled) {
+                startBGM();
+            } else {
+                stopBGM();
+            }
+        });
+
+        // Initialize on load
+        window.onload = () => {
+            initGame();
+        };
+    </script>
+</body>
+</html>
