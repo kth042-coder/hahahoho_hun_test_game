@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>바른 럭키드로우</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/gh/moonspam/NanumSquare@2.0/nanumsquare.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --green: #8dc63f;
+            --green-dark: #056130;
+            --olive: #68a12a;
+            --beige: #ece9de;
+            --cream: #f7f6f0;
+            --text: #333333;
+        }
+        body {
+            font-family: 'NanumSquare', 'Noto Sans KR', '맑은 고딕', sans-serif;
+            touch-action: manipulation;
+            color: var(--text);
+            background:
+                radial-gradient(circle at 15% 0%, rgba(141, 198, 63, 0.18), transparent 45%),
+                radial-gradient(circle at 100% 100%, rgba(5, 97, 48, 0.10), transparent 40%),
+                var(--cream);
+        }
+        .leaf-dot {
+            width: 10px; height: 10px;
+            border-radius: 0 100% 0 100%;
+            background: var(--green);
+            display: inline-block;
+        }
+        @keyframes reveal {
+            0% { transform: scale(0.6); opacity: 0; }
+            60% { transform: scale(1.12); opacity: 1; }
+            100% { transform: scale(1); }
+        }
+        .reveal { animation: reveal 0.5s cubic-bezier(.2,.9,.3,1.3) forwards; }
+        @keyframes fall {
+            to { transform: translateY(110vh) rotate(720deg); }
+        }
+        .confetti {
+            position: fixed; top: -20px; width: 10px; height: 14px;
+            pointer-events: none; z-index: 60;
+            animation: fall linear forwards;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4 select-none overflow-x-hidden">
+
+    <!-- Header -->
+    <header class="w-full max-w-md flex flex-col items-center gap-3 mb-4">
+        <nav class="flex gap-1 p-1 bg-white border border-[#e6e6e6] rounded-full text-sm font-bold">
+            <a href="index.html" class="px-4 py-1.5 rounded-full text-[#7a7a7a] hover:text-[#056130]">블록 퍼즐</a>
+            <a href="lucky-draw.html" class="px-4 py-1.5 rounded-full bg-[#8dc63f] text-white">럭키드로우</a>
+        </nav>
+        <div class="flex flex-col items-center gap-1 pt-1">
+            <p class="text-[13px] font-bold tracking-[0.2em] text-[#68a12a] flex items-center gap-2">
+                <span class="leaf-dot"></span> 오늘의 행운은 누구에게? <span class="leaf-dot" style="transform: scaleX(-1)"></span>
+            </p>
+            <h1 class="text-3xl font-black tracking-tight text-[#056130]">
+                바른 <span class="text-[#8dc63f]">럭키</span>드로우
+            </h1>
+        </div>
+    </header>
+
+    <main class="w-full max-w-md flex flex-col gap-4">
+        <!-- Draw stage -->
+        <section class="bg-white border border-[#e6e6e6] rounded-[20px] shadow-[0_12px_32px_rgba(5,97,48,0.12)] p-6 flex flex-col items-center gap-4">
+            <p id="prize-label" class="text-sm font-bold text-[#68a12a] bg-[#8dc63f]/15 px-4 py-1 rounded-full">🎁 경품</p>
+            <div class="w-full h-32 rounded-[20px] bg-[#f7f6f0] border border-[#ece9de] flex items-center justify-center overflow-hidden">
+                <p id="display" class="text-4xl font-black text-[#056130] text-center px-2 break-all">준비 완료!</p>
+            </div>
+            <p id="status" class="text-sm text-[#7a7a7a]">참가자 0명</p>
+            <button id="draw-btn" class="w-full py-4 bg-[#8dc63f] hover:bg-[#68a12a] disabled:bg-[#d4d4d4] disabled:shadow-none text-white text-lg font-extrabold rounded-full shadow-[0_6px_16px_rgba(141,198,63,0.35)] active:scale-95 transition-all">
+                🍀 추첨하기
+            </button>
+        </section>
+
+        <!-- Settings -->
+        <section class="bg-[#ece9de] border border-[#e0dccb] rounded-[20px] p-5 flex flex-col gap-3">
+            <h2 class="font-black text-[#056130]">추첨 설정</h2>
+            <label class="flex flex-col gap-1 text-sm font-bold">
+                경품 이름
+                <input id="prize-input" type="text" value="풀무원 선물세트" class="px-3 py-2 rounded-xl border border-[#d4d4d4] bg-white font-normal focus:outline-none focus:border-[#8dc63f]">
+            </label>
+            <div class="flex gap-3">
+                <label class="flex flex-col gap-1 text-sm font-bold flex-1">
+                    한 번에 뽑을 인원
+                    <input id="count-input" type="number" min="1" value="1" class="px-3 py-2 rounded-xl border border-[#d4d4d4] bg-white font-normal focus:outline-none focus:border-[#8dc63f]">
+                </label>
+                <label class="flex items-end gap-2 text-sm font-bold pb-2 flex-1">
+                    <input id="exclude-input" type="checkbox" checked class="w-5 h-5 accent-[#8dc63f]">
+                    당첨자 제외
+                </label>
+            </div>
+            <label class="flex flex-col gap-1 text-sm font-bold">
+                참가자 명단 <span class="font-normal text-[#7a7a7a] text-xs">한 줄에 한 명, 또는 쉼표로 구분</span>
+                <textarea id="names-input" rows="6" class="px-3 py-2 rounded-xl border border-[#d4d4d4] bg-white font-normal resize-y focus:outline-none focus:border-[#8dc63f]">김바른
+이초록
+박두부
+최콩나물
+정올리브
+한새싹
+오연두
+윤햇살</textarea>
+            </label>
+        </section>
+
+        <!-- Winners -->
+        <section class="bg-white border border-[#e6e6e6] rounded-[20px] p-5 flex flex-col gap-3">
+            <div class="flex justify-between items-center">
+                <h2 class="font-black text-[#056130]">🏆 당첨자 기록</h2>
+                <button id="reset-btn" class="text-xs font-bold text-[#7a7a7a] hover:text-[#d9483b] px-3 py-1 rounded-full border border-[#d4d4d4]">기록 초기화</button>
+            </div>
+            <ul id="winners" class="flex flex-col gap-2 text-sm">
+                <li class="text-[#7a7a7a]">아직 당첨자가 없습니다.</li>
+            </ul>
+        </section>
+    </main>
+
+    <div id="toast" class="fixed bottom-10 bg-[#056130] text-white px-5 py-2.5 rounded-full shadow-xl opacity-0 transition-opacity duration-300 pointer-events-none z-40 text-sm font-bold">알림</div>
+
+    <script>
+        const $ = id => document.getElementById(id);
+        const displayEl = $('display'), statusEl = $('status'), drawBtn = $('draw-btn');
+        const namesInput = $('names-input'), prizeInput = $('prize-input');
+        const countInput = $('count-input'), excludeInput = $('exclude-input');
+        const winnersEl = $('winners'), prizeLabel = $('prize-label');
+
+        const STORE_KEY = 'lucky_draw_state';
+        let winners = []; // { name, prize, time }
+        let drawing = false;
+
+        // --- 저장/불러오기 (실패해도 동작) ---
+        function save() {
+            try {
+                localStorage.setItem(STORE_KEY, JSON.stringify({
+                    names: namesInput.value, prize: prizeInput.value,
+                    count: countInput.value, exclude: excludeInput.checked, winners
+                }));
+            } catch (e) {}
+        }
+        function load() {
+            try {
+                const s = JSON.parse(localStorage.getItem(STORE_KEY));
+                if (!s) return;
+                namesInput.value = s.names ?? namesInput.value;
+                prizeInput.value = s.prize ?? prizeInput.value;
+                countInput.value = s.count ?? 1;
+                excludeInput.checked = s.exclude ?? true;
+                winners = Array.isArray(s.winners) ? s.winners : [];
+            } catch (e) {}
+        }
+
+        // --- 사운드 ---
+        let audioCtx = null;
+        function beep(freq, dur, type = 'sine', vol = 0.08, delay = 0) {
+            try {
+                audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+                const t = audioCtx.currentTime + delay;
+                const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, t);
+                gain.gain.setValueAtTime(vol, t);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(t); osc.stop(t + dur);
+            } catch (e) {}
+        }
+        function fanfare() {
+            [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => beep(f, 0.25, 'triangle', 0.15, i * 0.09));
+        }
+
+        // --- 데이터 ---
+        function getNames() {
+            const seen = new Set();
+            return namesInput.value.split(/[\n,]/).map(s => s.trim()).filter(n => n && !seen.has(n) && seen.add(n));
+        }
+        function getPool() {
+            const won = new Set(winners.map(w => w.name));
+            return excludeInput.checked ? getNames().filter(n => !won.has(n)) : getNames();
+        }
+        function updateStatus() {
+            const total = getNames().length, pool = getPool().length;
+            statusEl.textContent = excludeInput.checked
+                ? `참가자 ${total}명 · 추첨 가능 ${pool}명`
+                : `참가자 ${total}명`;
+            prizeLabel.textContent = `🎁 ${prizeInput.value.trim() || '경품'}`;
+            drawBtn.disabled = drawing || pool === 0;
+        }
+
+        // --- 추첨 ---
+        function pickRandom(arr, n) {
+            const a = [...arr];
+            for (let i = a.length - 1; i > 0; i--) {
+                const j = crypto.getRandomValues(new Uint32Array(1))[0] % (i + 1);
+                [a[i], a[j]] = [a[j], a[i]];
+            }
+            return a.slice(0, n);
+        }
+
+        function draw() {
+            const pool = getPool();
+            if (pool.length === 0) { showToast('추첨할 참가자가 없습니다.'); return; }
+            let n = Math.max(1, parseInt(countInput.value, 10) || 1);
+            if (n > pool.length) {
+                showToast(`추첨 가능 인원(${pool.length}명)만큼만 뽑습니다.`);
+                n = pool.length;
+            }
+            const picked = pickRandom(pool, n);
+            const prize = prizeInput.value.trim() || '경품';
+
+            drawing = true;
+            updateStatus();
+            displayEl.classList.remove('reveal');
+            displayEl.classList.replace('text-4xl', 'text-3xl');
+
+            // 점점 느려지는 셔플 연출
+            let delay = 40, elapsed = 0;
+            const tick = () => {
+                displayEl.textContent = pool[Math.floor(Math.random() * pool.length)];
+                beep(600 + Math.random() * 400, 0.05, 'square', 0.03);
+                elapsed += delay;
+                if (elapsed < 2600) {
+                    delay *= 1.08;
+                    setTimeout(tick, delay);
+                } else {
+                    finish(picked, prize);
+                }
+            };
+            tick();
+        }
+
+        function finish(picked, prize) {
+            displayEl.textContent = picked.join(', ');
+            displayEl.classList.replace('text-3xl', picked.length > 2 ? 'text-2xl' : 'text-4xl');
+            void displayEl.offsetWidth;
+            displayEl.classList.add('reveal');
+            fanfare();
+            confetti();
+
+            const time = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+            picked.forEach(name => winners.unshift({ name, prize, time }));
+            drawing = false;
+            save();
+            renderWinners();
+            updateStatus();
+            showToast(`🎉 ${picked.join(', ')}님 당첨!`);
+        }
+
+        function renderWinners() {
+            if (winners.length === 0) {
+                winnersEl.innerHTML = '<li class="text-[#7a7a7a]">아직 당첨자가 없습니다.</li>';
+                return;
+            }
+            winnersEl.innerHTML = '';
+            winners.forEach((w, i) => {
+                const li = document.createElement('li');
+                li.className = 'flex items-center gap-3 px-3 py-2 rounded-xl bg-[#f7f6f0] border border-[#ece9de]';
+                const num = document.createElement('span');
+                num.className = 'w-6 h-6 rounded-full bg-[#8dc63f] text-white text-xs font-black flex items-center justify-center shrink-0';
+                num.textContent = winners.length - i;
+                const name = document.createElement('span');
+                name.className = 'font-black text-[#056130]';
+                name.textContent = w.name;
+                const prize = document.createElement('span');
+                prize.className = 'text-[#7a7a7a] flex-1 truncate';
+                prize.textContent = w.prize;
+                const time = document.createElement('span');
+                time.className = 'text-xs text-[#a0a0a0]';
+                time.textContent = w.time;
+                li.append(num, name, prize, time);
+                winnersEl.appendChild(li);
+            });
+        }
+
+        function confetti() {
+            const colors = ['#8dc63f', '#056130', '#68a12a', '#b7d47f', '#f2b134', '#e8743b'];
+            for (let i = 0; i < 60; i++) {
+                const c = document.createElement('div');
+                c.className = 'confetti';
+                c.style.left = Math.random() * 100 + 'vw';
+                c.style.background = colors[i % colors.length];
+                c.style.borderRadius = i % 2 ? '0 100% 0 100%' : '2px';
+                c.style.animationDuration = 1.8 + Math.random() * 1.8 + 's';
+                c.style.animationDelay = Math.random() * 0.3 + 's';
+                document.body.appendChild(c);
+                setTimeout(() => c.remove(), 4200);
+            }
+        }
+
+        let toastTimeout;
+        function showToast(msg) {
+            const t = $('toast');
+            t.textContent = msg;
+            t.classList.remove('opacity-0');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => t.classList.add('opacity-0'), 2200);
+        }
+
+        // --- 이벤트 ---
+        drawBtn.addEventListener('click', draw);
+        $('reset-btn').addEventListener('click', () => {
+            if (drawing || winners.length === 0) return;
+            if (!confirm('당첨자 기록을 모두 지울까요?')) return;
+            winners = [];
+            save(); renderWinners(); updateStatus();
+            displayEl.textContent = '준비 완료!';
+        });
+        [namesInput, prizeInput, countInput, excludeInput].forEach(el =>
+            el.addEventListener('input', () => { save(); updateStatus(); }));
+
+        load();
+        renderWinners();
+        updateStatus();
+    </script>
+<script src="https://chatbot.aiconvergencelab.com/widget.js" data-slug="bot-987a71f7" data-title="태훈봇" data-position="right" data-offset="20" data-color="#056130" defer></script>
+</body>
+</html>
